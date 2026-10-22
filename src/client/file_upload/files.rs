@@ -151,13 +151,21 @@ pub fn parse_paths(text: &str) -> Result<Vec<PathBuf>> {
     let mut current = String::new();
     let mut quote = None;
     let mut escaped = false;
-    for ch in text.chars() {
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
         if escaped {
             current.push(ch);
             escaped = false;
             continue;
         }
         if ch == '\\' && quote != Some('\'') {
+            #[cfg(windows)]
+            if !matches!(chars.peek(), Some(next) if next.is_whitespace() || *next == '\'' || *next == '"')
+            {
+                // Native Windows paths use backslashes as separators, not shell escapes.
+                current.push('\\');
+                continue;
+            }
             escaped = true;
             continue;
         }
@@ -218,6 +226,12 @@ mod tests {
         );
         assert!(parse_paths("file://other-host/tmp/a").is_err());
         assert!(parse_paths("'/tmp/broken").is_err());
+    }
+    #[cfg(windows)]
+    #[test]
+    fn windows_paths_keep_directory_separators() {
+        let path = r"C:\Users\Ada\screenshot.PNG";
+        assert_eq!(parse_paths(path).unwrap(), vec![PathBuf::from(path)]);
     }
     #[test]
     fn rejects_batch_before_transfer_and_snapshots_content() {
