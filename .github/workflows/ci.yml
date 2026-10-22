@@ -171,7 +171,7 @@ jobs:
 
       - name: Check downstream upload and release selection
         if: runner.os == 'Linux'
-        run: python3 -m unittest scripts.test_file_upload_receiver scripts.test_select_upstream_release
+        run: python3 -m unittest scripts.test_file_upload_receiver scripts.test_select_upstream_release scripts.test_custom_launcher
 
       - name: Run Linux lint
         if: runner.os == 'Linux'
