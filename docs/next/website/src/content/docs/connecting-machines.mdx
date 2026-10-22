@@ -132,8 +132,9 @@ Live handoff is experimental and opt-in. For a supported server that needs repla
 With a saved SSH machine selected, focus the destination pane and drag a local
 file from your file manager into the terminal. Herdr uploads the bytes over SSH,
 shows progress in a centered overlay inside the window, and inserts the completed
-remote paths without pressing Enter. PDFs, images, archives, and other regular files work.
-The selected machine and focused pane supply the destination automatically.
+remote paths without pressing Enter. PDFs, Finder-dropped images, archives, and other regular files work.
+Image-only clipboard pastes retain Herdr's existing image bridge. Local workspace drops
+are unchanged. The selected machine and focused pane supply the destination automatically.
 
 The selected pane is captured at drop time and its terminal identity pinned on
 the first SSH query, before reading local file contents. Switching panes or machines

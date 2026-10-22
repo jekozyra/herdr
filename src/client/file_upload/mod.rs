@@ -236,17 +236,7 @@ fn dropped_paths(text: &str) -> Option<Vec<PathBuf>> {
         return None;
     }
     let paths = files::parse_paths(text).ok()?;
-    // Keep image paths on Herdr's existing image bridge, including mixed drops.
     if paths.is_empty()
-        || paths.iter().any(|path| {
-            path.extension()
-                .and_then(|ext| ext.to_str())
-                .is_some_and(|ext| {
-                    ["png", "jpg", "jpeg", "gif", "webp", "bmp"]
-                        .iter()
-                        .any(|image| ext.eq_ignore_ascii_case(image))
-                })
-        })
         || !paths.iter().all(|path| path.is_absolute())
         || !paths
             .iter()

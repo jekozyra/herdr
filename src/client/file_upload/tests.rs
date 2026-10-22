@@ -6,14 +6,22 @@ fn native_drop_accepts_pdf_quotes_and_rejects_prose_and_remote_paths() {
     let file = dir.path().join("report with spaces.pdf");
     std::fs::write(&file, b"test pdf").unwrap();
     let text = format!("'{}' ", file.display());
-    assert_eq!(dropped_paths(&text).unwrap(), vec![file]);
+    assert_eq!(dropped_paths(&text).unwrap(), vec![file.clone()]);
     assert!(dropped_paths("is this pdf available?").is_none());
     assert!(dropped_paths("/missing/remote/file.pdf").is_none());
     assert!(dropped_paths(&format!("please read {text}")).is_none());
     let image = dir.path().join("screenshot.PNG");
     std::fs::write(&image, b"test image").unwrap();
-    assert!(dropped_paths(image.to_str().unwrap()).is_none());
-    assert!(dropped_paths(&format!("'{}' {text}", image.display())).is_none());
+    assert_eq!(
+        dropped_paths(image.to_str().unwrap()),
+        Some(vec![image.clone()])
+    );
+    assert_eq!(
+        dropped_paths(&format!("'{}' {text}", image.display())),
+        Some(vec![image, file])
+    );
+    // Clipboard-only image paste has no local pathname to upload.
+    assert!(dropped_paths(drop_text(b"\x1b[200~\x1b[201~").unwrap()).is_none());
     assert_eq!(
         drop_text(b"\x1b[200~/tmp/test.pdf\x1b[201~"),
         Some("/tmp/test.pdf")
@@ -224,6 +232,48 @@ mod native_flow {
             .unwrap()
             .0
             .contains("Uploaded and inserted"));
+    }
+
+    #[tokio::test]
+    async fn saved_machine_image_uploads_but_local_workspace_does_not() {
+        let mut fixture = Fixture::new(false);
+        let image = fixture.dir.path().join("screenshot.png");
+        std::fs::write(&image, b"test image bytes").unwrap();
+        let mut uploads = Uploads::new(fixture.config.clone());
+        let mut shell = ClientShellState::file_upload_test_shell();
+        fixture.registry.insert(
+            ClientEndpointId::Local,
+            Sink,
+            2,
+            EndpointNegotiation::default(),
+            true,
+        );
+        fixture.registry.set_active(&ClientEndpointId::Local);
+        assert!(!uploads.try_drop(
+            image.to_str().unwrap(),
+            &fixture.catalog(),
+            &fixture.registry,
+            &shell
+        ));
+        assert!(fixture.calls.lock().unwrap().is_empty());
+        fixture
+            .registry
+            .set_active(&ClientEndpointId::Ssh(fixture.profile.id.clone()));
+        assert!(uploads.try_drop(
+            image.to_str().unwrap(),
+            &fixture.catalog(),
+            &fixture.registry,
+            &shell
+        ));
+        fixture.finish(&mut uploads, &mut shell).await;
+        let calls = fixture.calls.lock().unwrap();
+        let inserted = calls
+            .iter()
+            .find(|call| call["method"] == "pane.send_input")
+            .unwrap();
+        let paths = files::parse_paths(inserted["params"]["text"].as_str().unwrap()).unwrap();
+        assert_eq!(std::fs::read(&paths[0]).unwrap(), b"test image bytes");
+        assert!(paths[0].to_string_lossy().contains("/uploads/upload-"));
     }
 
     #[tokio::test]
