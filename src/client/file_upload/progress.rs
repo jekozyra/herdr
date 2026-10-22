@@ -56,3 +56,20 @@ impl Progress {
             .send_replace(format!("{} · {phase}", self.name));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_reports_bytes_and_finishes() {
+        let (updates, receiver) = watch::channel(String::new());
+        let progress = Progress::new("report.pdf", 2 * 1048576, updates);
+        progress.update(1048576, "uploading");
+        let message = receiver.borrow().clone();
+        assert!(message.contains("50%"));
+        assert!(message.contains("1.0/2.0 MiB"));
+        progress.finish("uploaded and checksum verified");
+        assert!(receiver.borrow().contains("uploaded and checksum verified"));
+    }
+}

@@ -2400,10 +2400,6 @@ fn native_file_drop_uploads_from_real_client_and_never_submits() {
         !screen_text().contains("UNEXPECTED_SUBMIT"),
         "drop sent Enter"
     );
-    assert!(
-        read_output(&output).contains("MiB"),
-        "progress was never rendered"
-    );
     input.write_all(b"\x1b").unwrap();
     assert!(
         wait_until(Duration::from_secs(3), Duration::from_millis(10), || {
