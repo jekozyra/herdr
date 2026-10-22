@@ -75,7 +75,7 @@ impl ClientShellState {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 impl ClientShellState {
     pub(crate) fn file_upload_test_shell() -> Self {
         let mut shell = Self::new(ClientShellConfig::from_config(
