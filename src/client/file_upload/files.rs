@@ -206,9 +206,15 @@ mod tests {
             parse_paths("'/tmp/a b.pdf' /tmp/c\\ d.txt").unwrap(),
             vec![PathBuf::from("/tmp/a b.pdf"), PathBuf::from("/tmp/c d.txt")]
         );
+        #[cfg(unix)]
         assert_eq!(
             parse_paths("file:///tmp/a%20b.pdf\r\n").unwrap(),
             vec![PathBuf::from("/tmp/a b.pdf")]
+        );
+        #[cfg(windows)]
+        assert_eq!(
+            parse_paths("file:///C:/tmp/a%20b.pdf\r\n").unwrap(),
+            vec![PathBuf::from(r"C:\tmp\a b.pdf")]
         );
         assert!(parse_paths("file://other-host/tmp/a").is_err());
         assert!(parse_paths("'/tmp/broken").is_err());

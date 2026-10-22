@@ -5775,15 +5775,20 @@ mod tests {
 
         let backend = ratatui::backend::TestBackend::new(20, 1);
         let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        // Ratatui omits wide continuation cells from backend diffs, so inspect
+        // the rendered frame rather than the TestBackend's unchanged blank cell.
+        let mut tail = String::new();
         terminal
-            .draw(|frame| pane.render(frame, Rect::new(0, 0, 20, 1), false))
+            .draw(|frame| {
+                pane.render(frame, Rect::new(0, 0, 20, 1), false);
+                tail = frame.buffer_mut()[(1, 0)].symbol().to_owned();
+            })
             .unwrap();
         let buffer = terminal.backend().buffer();
 
         assert_eq!(buffer[(0, 0)].symbol(), "ｶ\u{ff9e}");
         assert_eq!(
-            buffer[(1, 0)].symbol(),
-            "",
+            tail, "",
             "wide spacer tail must stay empty so the host terminal does not overwrite the voiced kana"
         );
         assert_eq!(buffer[(2, 0)].symbol(), "Z");
