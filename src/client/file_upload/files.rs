@@ -152,6 +152,8 @@ pub fn parse_paths(text: &str) -> Result<Vec<PathBuf>> {
     let mut quote = None;
     let mut escaped = false;
     let mut chars = text.chars().peekable();
+    // Windows backslashes need one-character lookahead to distinguish path separators.
+    #[allow(clippy::while_let_on_iterator)]
     while let Some(ch) = chars.next() {
         if escaped {
             current.push(ch);

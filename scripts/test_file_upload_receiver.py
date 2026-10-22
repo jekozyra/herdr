@@ -14,6 +14,7 @@ import unittest
 RECEIVER = Path(__file__).resolve().parents[1] / "src/client/file_upload/receiver.py"
 
 
+@unittest.skipUnless(os.name == "posix", "remote receiver requires POSIX permissions and Unix sockets")
 class ReceiverTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
