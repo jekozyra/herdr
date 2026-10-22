@@ -1,0 +1,107 @@
+name: Prepare upstream release PR
+
+on:
+  schedule:
+    - cron: '23 10 * * 2'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Stable upstream release tag (leave blank for latest)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: prepare-upstream-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository == 'jekozyra/herdr'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout customized master
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select stable upstream release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "$REQUESTED_TAG" ]; then
+            [[ "$REQUESTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected vMAJOR.MINOR.PATCH' >&2; exit 1; }
+            gh api "repos/herdrdev/herdr/releases/tags/$REQUESTED_TAG" > "$RUNNER_TEMP/upstream-release.json"
+          else
+            gh api repos/herdrdev/herdr/releases/latest > "$RUNNER_TEMP/upstream-release.json"
+          fi
+          python3 scripts/select_upstream_release.py \
+            --current .github/upstream-release.txt \
+            --release-json "$RUNNER_TEMP/upstream-release.json" \
+            --output "$GITHUB_OUTPUT"
+
+      - name: Prepare draft PR within this fork
+        if: steps.release.outputs.tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          branch="upgrade/herdr-$TAG"
+          cat > "$RUNNER_TEMP/upstream-pr-body.md" <<EOF
+          ## Upstream Herdr $TAG
+
+          This PR targets **this fork's master**, not herdrdev/herdr. The upstream release tag is merged into the customized build; do not reset master to upstream.
+
+          - [ ] Inspect changes, especially upload code, dependencies, and upstream workflows.
+          - [ ] Linux/macOS CI passed (the updater dispatches CI because GitHub-token PRs do not trigger it).
+          - [ ] Build on the Mac and smoke-test Finder PDF + image drops into a saved devbox Pi pane.
+          - [ ] Verify clipboard-only image paste still uses the existing image bridge.
+          - [ ] Keep the official Mac binary and the previous custom binary for rollback.
+
+          **Do not merge or install automatically.** Resolve any failures before merging.
+          EOF
+
+          if [ "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq 'length')" != 0 ]; then
+            echo "An upgrade PR for $TAG is already open."
+            exit 0
+          fi
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "Upgrade branch $branch already exists; trying to open its PR."
+          else
+            gh auth setup-git
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git switch -c "$branch"
+            git remote add upstream https://github.com/herdrdev/herdr.git
+            git fetch --no-tags upstream "refs/tags/$TAG:refs/tags/$TAG"
+            if ! git merge --no-ff --no-edit "refs/tags/$TAG^{commit}"; then
+              {
+                echo "## Herdr $TAG needs a manual port"
+                echo 'The release merge conflicted; no PR or branch was pushed.'
+                echo 'Conflicted paths:'
+                git diff --name-only --diff-filter=U
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            printf '%s\n' "$TAG" > .github/upstream-release.txt
+            git add .github/upstream-release.txt
+            git commit -m "chore: record upstream $TAG release"
+            git push -u origin "$branch"
+          fi
+          gh pr create --repo "$GITHUB_REPOSITORY" --base master --head "$branch" \
+            --draft --title "chore: prepare Herdr $TAG upgrade" \
+            --body-file "$RUNNER_TEMP/upstream-pr-body.md"
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
