@@ -381,6 +381,25 @@ pub(crate) fn write_existing_config(
     config_backup::write_existing(target, contents)
 }
 
+pub(crate) fn open_upload_source(
+    path: &std::path::Path,
+    allow_symlinks: bool,
+) -> std::io::Result<std::fs::File> {
+    use std::os::windows::fs::OpenOptionsExt;
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(if allow_symlinks {
+            0
+        } else {
+            windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT
+        })
+        .open(path)?;
+    if !allow_symlinks && file.metadata()?.file_type().is_symlink() {
+        return Err(std::io::Error::other("symlinks are disabled for uploads"));
+    }
+    Ok(file)
+}
+
 #[cfg(test)]
 fn config_security_descriptor(
     path: &std::path::Path,

@@ -720,6 +720,9 @@ impl ClientShellState {
             self.hits.pane_splits.clear();
             self.hits.popup = None;
         }
+        if let Some(area) = self.render_file_upload_notice(&mut frame, cols, rows) {
+            occlusion.cover(area);
+        }
         let graphics = self.compose_graphics(layout, &occlusion);
         Some(crate::client::frame_output::ComposedFrame { frame, graphics })
     }

@@ -3,6 +3,8 @@ use std::{collections::BTreeSet, num::NonZeroUsize};
 use crossterm::event::KeyModifiers;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
+use super::file_upload::FileUploadConfig;
+
 use super::{
     ActionKeybinds, BindingConfig, CommandKeybindConfig, IndexedKeybind, Keybinds, SidebarConfig,
     SoundConfig, TabBarRightEntryConfig, ThemeConfig, DEFAULT_MOBILE_WIDTH_THRESHOLD,
@@ -311,6 +313,7 @@ pub fn validated_sidebar_bounds(min: u16, max: u16) -> Option<(u16, u16)> {
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    pub file_upload: FileUploadConfig,
     pub onboarding: Option<bool>,
     pub theme: ThemeConfig,
     pub terminal: TerminalConfig,

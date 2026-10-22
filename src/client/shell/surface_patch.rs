@@ -60,7 +60,7 @@ fn fast_path_blocker(
 ) -> Option<&'static str> {
     if state.mode != ClientShellMode::Terminal {
         Some("client_surface_patch.fallback.mode")
-    } else if state.overlay.is_some() {
+    } else if state.overlay.is_some() || state.file_upload_notice.is_some() {
         Some("client_surface_patch.fallback.overlay")
     } else if state.endpoint_error.is_some() {
         Some("client_surface_patch.fallback.endpoint_error")

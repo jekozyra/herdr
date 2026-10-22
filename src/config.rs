@@ -1,5 +1,6 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 
+pub(crate) mod file_upload;
 mod io;
 mod keybinds;
 mod model;

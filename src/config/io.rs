@@ -5,6 +5,7 @@ use tracing::warn;
 use super::{model::LoadedConfig, Config, CONFIG_PATH_ENV_VAR};
 
 const KNOWN_TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
+    "file_upload",
     "advanced",
     "experimental",
     "keys",
@@ -376,6 +377,21 @@ fn load_live_config_from_str(content: &str) -> Result<LoadedConfig, Vec<String>>
         |section| config.remote = section,
     );
 
+    load_live_section(
+        table,
+        "file_upload",
+        "file upload config",
+        &mut diagnostics,
+        &mut invalid_sections,
+        |section| config.file_upload = section,
+    );
+
+    if invalid_sections
+        .iter()
+        .any(|section| section == "file_upload")
+    {
+        config.file_upload.enabled = false;
+    }
     diagnostics.extend(config.theme.diagnostics());
 
     Ok(LoadedConfig {

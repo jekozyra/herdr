@@ -940,3 +940,9 @@ pub(crate) fn shared_ssh_control_path(
         "interactive SSH recovery requires Unix OpenSSH multiplexing",
     ))
 }
+
+/// Open a dropped file without blocking on special files or following a final symlink.
+#[cfg(unix)]
+pub(crate) use unix_common::open_upload_source;
+#[cfg(windows)]
+pub(crate) use windows::open_upload_source;

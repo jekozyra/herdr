@@ -305,7 +305,7 @@ fn send_unix_input_chunks(
     sgr_pixels: bool,
     geometry: Option<crate::input::mouse::HostGeometry>,
 ) -> bool {
-    for data in chunks {
+    for data in coalesce_file_drop_chunks(chunks) {
         let palette_response = std::str::from_utf8(&data)
             .ok()
             .and_then(crate::terminal_theme::parse_palette_color_response)
@@ -472,6 +472,34 @@ fn poll_read_ready(fd: i32, timeout_ms: i32) -> Option<bool> {
 // Tests
 // ---------------------------------------------------------------------------
 
+/// A plain terminal drop may be split into character chunks by the input framer.
+#[cfg(unix)]
+fn coalesce_file_drop_chunks(chunks: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+    if chunks.len() < 2 {
+        return chunks;
+    }
+    let first = chunks.first().and_then(|chunk| chunk.first()).copied();
+    if !matches!(first, Some(b'/' | b'\'' | b'"' | b'f')) {
+        return chunks;
+    }
+    if !chunks
+        .iter()
+        .flatten()
+        .all(|byte| *byte >= 32 || matches!(*byte, b'\r' | b'\n' | b'\t'))
+    {
+        return chunks;
+    }
+    let joined: Vec<u8> = chunks.iter().flatten().copied().collect();
+    if !(joined.starts_with(b"/")
+        || joined.starts_with(b"'/")
+        || joined.starts_with(b"\"/")
+        || joined.starts_with(b"file://"))
+    {
+        return chunks;
+    }
+    vec![joined]
+}
+
 #[cfg(all(test, unix))]
 mod tests {
     // The stdin reader thread is hard to unit test since it reads from actual stdin.
@@ -489,6 +517,29 @@ mod tests {
             ClientLoopEvent::StdinInput(d) => assert_eq!(d, data),
             _ => panic!("expected StdinInput event"),
         }
+    }
+
+    #[test]
+    fn native_file_drop_survives_host_input_framing() {
+        let plain = b"'/tmp/report with spaces.pdf' ";
+        let mut framer = crate::raw_input::RawInputByteFramer::for_host_input();
+        assert_eq!(
+            coalesce_file_drop_chunks(framer.push(plain)),
+            vec![plain.to_vec()]
+        );
+        let control = b"\x1b[A";
+        assert_eq!(
+            coalesce_file_drop_chunks(framer.push(control)),
+            vec![control.to_vec()]
+        );
+        let framed = b"\x1b[200~/tmp/report.pdf\x1b[201~";
+        assert!(framer.push(&framed[..15]).is_empty());
+        assert_eq!(
+            coalesce_file_drop_chunks(framer.push(&framed[15..])),
+            vec![framed.to_vec()]
+        );
+        let typed = vec![b"a".to_vec(), b"b".to_vec()];
+        assert_eq!(coalesce_file_drop_chunks(typed.clone()), typed);
     }
 
     #[test]

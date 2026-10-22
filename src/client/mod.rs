@@ -23,6 +23,7 @@ pub(crate) mod endpoint;
 mod endpoint_commands;
 mod errors;
 mod events;
+mod file_upload;
 mod frame_output;
 #[cfg(test)]
 mod frame_output_tests;
@@ -213,6 +214,7 @@ fn run_client_with_mode(
         .as_ref()
         .is_some_and(shell::ClientShellConfig::uses_endpoint_keybindings);
     let mut loop_config = ClientLoopConfig {
+        file_upload: loaded_config.config.file_upload.clone(),
         sound_config: loaded_config.config.ui.sound,
         mouse_scroll_lines,
         redraw_on_focus_gained,
@@ -492,6 +494,7 @@ async fn run_client_loop(
         detached_process_children: Vec::new(),
         shell: config.shell_config.map(shell::ClientShellState::new),
     };
+    let mut file_uploads = file_upload::Uploads::new(config.file_upload);
     let mut federated = endpoint_catalog.has_enabled_ssh();
     if let Some(shell) = state.shell.as_mut() {
         shell.set_host_reports_key_releases(config.host_escape_disambiguation_active);
@@ -832,6 +835,26 @@ async fn run_client_loop(
                     write_stream.active_id(),
                     write_stream.active_surface_available(),
                 );
+                if let Some(shell) = state.shell.as_ref() {
+                    let consumed = if data == b"\x1b" {
+                        file_uploads.cancel()
+                    } else {
+                        file_upload::drop_text(&data).is_some_and(|text| {
+                            file_uploads.try_drop(text, &endpoint_catalog, &write_stream, shell)
+                        })
+                    };
+                    if consumed {
+                        if let Some(shell) = state.shell.as_mut() {
+                            file_uploads.poll(&write_stream, shell).await;
+                            if let Some(frame) =
+                                shell.compose(state.reported_size.0, state.reported_size.1)
+                            {
+                                state.present_frame(frame);
+                            }
+                        }
+                        continue;
+                    }
+                }
                 if state.shell.is_some() {
                     if will_query_host_cell_size {
                         let events = crate::raw_input::parse_framed_input(&data);
@@ -1139,6 +1162,28 @@ async fn run_client_loop(
                     write_stream.active_id(),
                     write_stream.active_surface_available(),
                 );
+                if let Some(shell) = state.shell.as_ref() {
+                    let consumed = match events.as_slice() {
+                        [crate::protocol::ClientInputEvent::Paste { text }] => {
+                            file_uploads.try_drop(text, &endpoint_catalog, &write_stream, shell)
+                        }
+                        [event] if matches!(event.to_raw_input_event(), crate::raw_input::RawInputEvent::Key(key) if key.code == crossterm::event::KeyCode::Esc && key.modifiers.is_empty()) => {
+                            file_uploads.cancel()
+                        }
+                        _ => false,
+                    };
+                    if consumed {
+                        if let Some(shell) = state.shell.as_mut() {
+                            file_uploads.poll(&write_stream, shell).await;
+                            if let Some(frame) =
+                                shell.compose(state.reported_size.0, state.reported_size.1)
+                            {
+                                state.present_frame(frame);
+                            }
+                        }
+                        continue;
+                    }
+                }
                 if state.shell.is_some() {
                     if events.iter().any(|event| {
                         matches!(event, crate::protocol::ClientInputEvent::FocusGained)
@@ -2309,6 +2354,7 @@ async fn run_client_loop(
                     let (effects, outcome, frame) = {
                         let shell = state.shell.as_mut().expect("checked shell mode");
                         let mut outcome = shell.tick_selection_autoscroll(now);
+                        outcome.repaint |= file_uploads.poll(&write_stream, shell).await;
                         for expired in expired_endpoints {
                             if !shell.endpoint_is_active(&expired.endpoint_id) {
                                 continue;

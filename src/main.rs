@@ -412,6 +412,35 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
 # force keepalive or multiplexing off, it only stops herdr from adding its own.
 # manage_ssh_config = true
 
+[file_upload]
+# Automatically upload file drops to the focused pane on a saved SSH machine.
+# Runs in the local client. Reconnect the client after changing these settings.
+# enabled = true
+# destination = "~/.local/share/herdr/uploads"
+# python = "python3"                 # remote Python 3.9+, standard library only
+
+[file_upload.limits]
+# max_file_bytes = 104857600         # 100 MiB per file
+# max_total_bytes = 262144000        # 250 MiB per drop
+# max_files = 10
+# allow_extensions = []
+# deny_extensions = []
+# allow_hidden = false
+# allow_symlinks = false
+
+[file_upload.ssh]
+# config_file = "/home/me/.ssh/config"
+# identity_file = "/home/me/.ssh/id_ed25519"
+# jump_host = "bastion"
+# connect_timeout_seconds = 15
+# operation_timeout_seconds = 600
+# chunk_bytes = 1048576
+
+# Overrides use the exact SSH target from the saved machine profile.
+# [file_upload.targets.workbox]
+# destination = "~/agent-files"
+# socket = "~/.config/herdr/sessions/agents/herdr.sock"
+
 [experimental]
 # Allow launching herdr from inside a herdr-managed pane.
 # allow_nested = false

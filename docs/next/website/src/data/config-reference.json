@@ -1535,6 +1535,150 @@
           "description": "While prefix mode is active, temporarily switch the host input source to an ASCII-capable mode so prefix commands are read as ASCII even when an IME is active, then restore the previous input source when prefix mode exits. On macOS this selects the ASCII-capable keyboard layout; on Windows it switches the IME to English (ASCII) input. Windows support is currently limited to the Korean IME; with an IME for any other language, the input source is left unchanged. macOS and Windows only; a no-op elsewhere and a best-effort no-op if the switch fails."
         }
       ]
+    },
+    {
+      "id": "file-upload",
+      "title": "File uploads",
+      "keys": [
+        {
+          "key": "file_upload.enabled",
+          "type": "boolean",
+          "default": "true",
+          "description": "Automatically upload local file drops in a focused pane on a saved SSH machine. Reconnect the client after changing upload settings."
+        },
+        {
+          "key": "file_upload.limits.max_file_bytes",
+          "type": "integer",
+          "default": "104857600",
+          "description": "Maximum bytes per file (100 MiB)."
+        },
+        {
+          "key": "file_upload.limits.max_total_bytes",
+          "type": "integer",
+          "default": "262144000",
+          "description": "Maximum bytes in one drop (250 MiB)."
+        },
+        {
+          "key": "file_upload.limits.max_files",
+          "type": "integer",
+          "default": "10",
+          "description": "Maximum files in one drop."
+        },
+        {
+          "key": "file_upload.limits.allow_extensions",
+          "type": "array of strings",
+          "default": "[]",
+          "description": "Allowed filename suffixes, case-insensitive; empty allows any suffix."
+        },
+        {
+          "key": "file_upload.limits.deny_extensions",
+          "type": "array of strings",
+          "default": "[]",
+          "description": "Denied suffixes, taking precedence over the allow list."
+        },
+        {
+          "key": "file_upload.limits.allow_hidden",
+          "type": "boolean",
+          "default": "false",
+          "description": "Allow filenames beginning with a dot."
+        },
+        {
+          "key": "file_upload.limits.allow_symlinks",
+          "type": "boolean",
+          "default": "false",
+          "description": "Allow the final local file component to be a symbolic link."
+        },
+        {
+          "key": "file_upload.ssh.executable",
+          "type": "string",
+          "default": "\"ssh\"",
+          "description": "Local OpenSSH executable."
+        },
+        {
+          "key": "file_upload.ssh.config_file",
+          "type": "string",
+          "default": "unset",
+          "description": "Optional OpenSSH config file passed with -F."
+        },
+        {
+          "key": "file_upload.ssh.identity_file",
+          "type": "string",
+          "default": "unset",
+          "description": "Optional SSH identity file passed with -i."
+        },
+        {
+          "key": "file_upload.ssh.port",
+          "type": "integer",
+          "default": "unset",
+          "description": "Optional SSH port; otherwise use the selected target and SSH config."
+        },
+        {
+          "key": "file_upload.ssh.jump_host",
+          "type": "string",
+          "default": "unset",
+          "description": "Optional jump host passed with -J."
+        },
+        {
+          "key": "file_upload.ssh.batch_mode",
+          "type": "boolean",
+          "default": "true",
+          "description": "Disable interactive authentication prompts for background uploads. Use an SSH agent."
+        },
+        {
+          "key": "file_upload.ssh.connect_timeout_seconds",
+          "type": "integer",
+          "default": "15",
+          "description": "Connection timeout in seconds."
+        },
+        {
+          "key": "file_upload.ssh.operation_timeout_seconds",
+          "type": "integer",
+          "default": "600",
+          "description": "Timeout for each upload or pane API operation."
+        },
+        {
+          "key": "file_upload.ssh.keepalive_seconds",
+          "type": "integer",
+          "default": "15",
+          "description": "SSH keepalive interval in seconds."
+        },
+        {
+          "key": "file_upload.ssh.chunk_bytes",
+          "type": "integer",
+          "default": "1048576",
+          "description": "Acknowledged chunk size; 4096 through 8388608 bytes."
+        },
+        {
+          "key": "file_upload.ssh.options",
+          "type": "table",
+          "default": "{}",
+          "description": "Trusted additional OpenSSH options as a string-to-string table."
+        },
+        {
+          "key": "file_upload.destination",
+          "type": "string",
+          "default": "\"~/.cache/herdr/uploads\"",
+          "description": "Dedicated private directory on the remote host."
+        },
+        {
+          "key": "file_upload.python",
+          "type": "string",
+          "default": "\"python3\"",
+          "description": "Remote Python 3.9+ executable; only the standard library is used."
+        },
+        {
+          "key": "file_upload.retention_seconds",
+          "type": "integer",
+          "default": "2592000",
+          "description": "Expiry metadata in seconds; no automatic deletion daemon is installed."
+        },
+        {
+          "key": "file_upload.targets",
+          "type": "table",
+          "default": "{}",
+          "description": "Overrides keyed by the saved SSH target. Supports destination, socket, python, retention_seconds, ssh and limits. SSH and limits sections replace their global sections. The selected machine owns the host identity."
+        }
+      ]
     }
   ]
 }

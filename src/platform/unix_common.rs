@@ -558,6 +558,17 @@ pub(crate) fn set_default_plugin_pane_pwd(env: &mut Vec<(String, String)>, cwd: 
     }
 }
 
+pub(crate) fn open_upload_source(
+    path: &std::path::Path,
+    allow_symlinks: bool,
+) -> std::io::Result<std::fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK | if allow_symlinks { 0 } else { libc::O_NOFOLLOW })
+        .open(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

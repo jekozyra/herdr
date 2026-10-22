@@ -1113,8 +1113,8 @@ fn retained_surface_patch_updates_only_pane_cells_without_recomposing_chrome() {
 }
 
 #[test]
-fn retained_surface_patch_recomposes_client_owned_mode_and_diagnostic_rows() {
-    for diagnostic in [false, true] {
+fn retained_surface_patch_recomposes_client_owned_overlays_and_rows() {
+    for surface_kind in 0..3 {
         let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
         state.set_snapshot(Box::new(snapshot()));
         let pane_surface = surface();
@@ -1122,10 +1122,12 @@ fn retained_surface_patch_recomposes_client_owned_mode_and_diagnostic_rows() {
         updated_pane.content_revision = 2;
         state.set_pane_surface(pane_surface);
         state.compose(100, 30).expect("initial composed frame");
-        if diagnostic {
-            state.config_diagnostic = Some("invalid config".into());
-        } else {
-            state.mode = ClientShellMode::Prefix;
+        match surface_kind {
+            0 => state.mode = ClientShellMode::Prefix,
+            1 => state.config_diagnostic = Some("invalid config".into()),
+            _ => {
+                state.set_file_upload_notice(Some("uploading".into()), true);
+            }
         }
         let patch = crate::protocol::PaneSurfacePatch {
             boot_id: "boot-1".into(),

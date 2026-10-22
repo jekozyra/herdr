@@ -126,3 +126,105 @@ The client and server negotiate compatibility rather than requiring identical ve
 Updating a compatible client does not replace the running remote server or stop its agents. When you need new server-side behavior, update that server explicitly. Normal replacement asks before stopping the server and its pane processes.
 
 Live handoff is experimental and opt-in. For a supported server that needs replacement during standalone setup, you can explicitly add `--handoff` to `herdr --remote`; it is not needed for normal connections or authentication fixes. See [Update](/docs/install/#update) for restart and handoff choices, and [Session state and restore](/docs/session-state/) for what survives each operation.
+
+## Drop local files into a remote pane
+
+With a saved SSH machine selected, focus the destination pane and drag a local
+file from your file manager into the terminal. Herdr uploads the bytes over SSH,
+shows progress in a centered overlay inside the window, and inserts the completed
+remote paths without pressing Enter. PDFs, images, archives, and other regular files work.
+The selected machine and focused pane supply the destination automatically.
+
+The selected pane is captured at drop time and its terminal identity pinned on
+the first SSH query, before reading local file contents. Switching panes or machines
+after pinning does not redirect it. A disconnected/replaced connection or changed terminal stops
+insertion. Press Esc during an upload to cancel; after completion, Esc closes the
+overlay. Completed files may remain after
+cancellation; after an ambiguous insertion failure, inspect the prompt before
+retrying. All files must finish before any paths are inserted.
+
+Defaults are 100 MiB per file, 250 MiB per drop, and ten files. Filenames beginning
+with a dot, final-component symlinks, and directories are rejected by default.
+Dropped files are snapshotted locally and checked with SHA-256 after transfer.
+Local free space must cover the selected files while uploading.
+
+The remote host needs Python 3.9+; no packages or daemon are installed. This uses
+OpenSSH and Herdr's public pane API, so the remote Herdr binary does not need this
+client patch. Existing SSH aliases, identities, ports, and jump hosts apply.
+
+This is a downstream build of Herdr 0.9.5, not an upstream release or a
+plugin. Build and test it on the Mac before changing the installed binary.
+See the downstream checkout's `LOCAL_FILE_DROP.md` for build, validation,
+rollback, and update instructions. The feature is not yet verified on macOS.
+
+Runtime requirements:
+
+- Local OpenSSH (`ssh` on PATH), readable source files, and temporary disk space
+  for the whole drop. No local Python is needed to upload.
+- SSH access that succeeds with `ssh -T -o BatchMode=yes workbox true`. Approve
+  host keys and load passphrase-protected keys interactively before uploading.
+- Remote Python 3.9+ available in the non-interactive SSH PATH (or an absolute
+  configured `python` path), a running compatible Herdr server exposing
+  `pane.get` and `pane.send_input`, and writable private upload storage.
+- A local terminal that delivers dropped files as paths. Bracketed paste is
+  supported across input reads; plain drops must arrive in one input batch.
+  File-manager/terminal combinations need their own drag-and-drop smoke test.
+
+The default remote socket is under `~/.config/herdr`. If the server uses a custom
+`XDG_CONFIG_HOME` or socket location, set the target's `socket` explicitly. Upload
+destinations containing symlink components are rejected; choose a physical path
+when a home or data directory is symlinked. Filenames must be valid UTF-8 without
+control characters or backslashes.
+
+### Upload settings
+
+Configure the **local** `config.toml`, then reconnect the client:
+
+```toml
+[file_upload]
+enabled = true
+destination = "~/.cache/herdr/uploads"
+python = "python3"
+
+[file_upload.limits]
+max_file_bytes = 104857600
+max_total_bytes = 262144000
+max_files = 10
+allow_extensions = []
+deny_extensions = []
+allow_hidden = false
+allow_symlinks = false
+
+[file_upload.ssh]
+connect_timeout_seconds = 15
+operation_timeout_seconds = 600
+chunk_bytes = 1048576
+# identity_file = "/home/me/.ssh/id_ed25519"
+# jump_host = "bastion"
+
+# Key overrides by the exact SSH target saved in the machine profile.
+[file_upload.targets.workbox]
+destination = "~/agent-files"
+# socket = "~/.config/herdr/sessions/agents/herdr.sock"
+```
+
+Path overrides inherit other settings; a target's `ssh` or `limits` section
+replaces that whole global section, with omitted fields using built-in defaults.
+Unknown upload settings disable the automatic uploader and produce a config
+warning. The full field list is in the [configuration reference](/docs/configuration/).
+
+Files live in unique private upload directories under `~/.cache/herdr/uploads/`.
+The default retention is 30 days; expired marked upload directories are removed
+opportunistically on the next upload, not by a scheduled job. A remote
+`~/.config/herdr/file-upload-policy.json` may additionally restrict
+`max_file_bytes`, `allowed_directories`, `allow_extensions`, and `deny_extensions`.
+This is application policy owned by the SSH user, not an SSH security boundary.
+
+Terminal drops arrive as text. A complete paste containing only existing absolute
+local file paths is treated the same as a drop; ordinary prose and absent remote
+paths pass through. Bracketed paste supports fragmented input; unbracketed drops
+must arrive together in one terminal input batch. This integration currently
+requires a locally running Herdr client with a **saved SSH machine** selected.
+It does not intercept drops inside client dialogs, popups, Local, or an ordinary
+SSH shell running Herdr entirely on the server. Agent-specific attachment chips
+and support for decoding each format remain the agent's responsibility.

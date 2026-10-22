@@ -2255,3 +2255,177 @@ fn client_receives_notify_on_agent_state_change() {
 
     cleanup_spawned_herdr(spawned, base);
 }
+
+#[test]
+fn native_file_drop_uploads_from_real_client_and_never_submits() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let _lock = test_lock();
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let api_socket = runtime_dir.join("herdr.sock");
+    let remote_config = base.join("remote-config");
+    let remote_runtime = base.join("remote-runtime");
+    let remote_api = remote_runtime.join("herdr.sock");
+    let remote_client = remote_runtime.join("herdr-client.sock");
+    let remote_server = spawn_server(&remote_config, &remote_runtime, &remote_api, &remote_client);
+    wait_for_socket(&remote_api, Duration::from_secs(10));
+    wait_for_socket(&remote_client, Duration::from_secs(10));
+    let created = send_json_request(
+        &remote_api,
+        &serde_json::json!({
+            "id": "remote-workspace", "method": "workspace.create",
+            "params": {"cwd": base, "focus": true, "label": "remote-ready"},
+        })
+        .to_string(),
+    );
+    let remote_pane = created["result"]["root_pane"]["pane_id"].as_str().unwrap();
+    send_pane_shell_command(&remote_api, remote_pane, "printf 'REMOTE_INITIAL_FRAME\\n'");
+
+    fs::create_dir_all(config_home.join(app_dir_name())).unwrap();
+    fs::write(
+        config_home.join(app_dir_name()).join("config.toml"),
+        format!("onboarding = false\n[file_upload]\ndestination = {:?}\n[file_upload.ssh]\nchunk_bytes = 4096\n[file_upload.targets.test-only]\nsocket = {:?}\n", base.join("uploads"), remote_api),
+    )
+    .unwrap();
+    let catalog_dir = runtime_dir
+        .join("state")
+        .join(app_dir_name())
+        .join("client");
+    fs::create_dir_all(&catalog_dir).unwrap();
+    let profile = "0123456789abcdef0123456789abcdef";
+    fs::write(catalog_dir.join("endpoints.json"), serde_json::json!({
+        "version": 1, "selected_profile": profile,
+        "ssh": [{"id": profile, "label": "Test remote", "target": "test-only", "session": "default", "enabled": true}],
+    }).to_string()).unwrap();
+
+    // The SSH executable is private to this client. Discovery and the stdio bridge run the real
+    // binary against a second disposable local server, never the developer's saved hosts.
+    let bin = base.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    fs::create_dir_all(base.join("home")).unwrap();
+    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_herdr"), bin.join("herdr")).unwrap();
+    let quote =
+        |path: &std::path::Path| format!("'{}'", path.display().to_string().replace('\'', "'\\''"));
+    let ssh_commands = base.join("ssh-commands");
+    let bridge_pid = base.join("bridge-pid");
+    fs::write(bin.join("ssh"), format!(
+        "#!/bin/sh\nexport HOME={} XDG_CONFIG_HOME={} XDG_RUNTIME_DIR={} HERDR_SOCKET_PATH={}\nunset HERDR_CLIENT_SOCKET_PATH HERDR_SESSION\nfor arg do last=\"$arg\"; done\nprintf '%s\\n' \"$last\" >> {}\ncase \"$last\" in *remote-client-bridge*) printf '%s\\n' \"$$\" > {};; esac\nexec /bin/sh -c \"$last\"\n",
+        quote(&base.join("home")), quote(&remote_config), quote(&remote_runtime), quote(&remote_api), quote(&ssh_commands), quote(&bridge_pid),
+    )).unwrap();
+    fs::set_permissions(bin.join("ssh"), fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!(
+        "{}:{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let client = spawn_client_process_with_args_and_env(
+        &config_home,
+        &runtime_dir,
+        &api_socket,
+        &["client"],
+        &[("PATH", &path)],
+    );
+    let output = spawn_pty_drain(client._master.as_ref().unwrap().try_clone_reader().unwrap());
+    let screen_text = || {
+        let bytes = output
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .bytes
+            .clone();
+        terminal_screen::text(&bytes, 80, 24)
+    };
+    assert!(
+        wait_until(Duration::from_secs(12), Duration::from_millis(20), || {
+            screen_text().contains("REMOTE_INITIAL_FRAME")
+        }),
+        "remote must be usable before Local exists: {}",
+        read_output(&output)
+    );
+    assert!(
+        fs::read_to_string(&ssh_commands)
+            .unwrap()
+            .contains("remote-client-bridge --idle-timeout-v1"),
+        "saved machine discovery must opt into the advertised bridge idle timeout"
+    );
+
+    let mut input = client._master.as_ref().unwrap().take_writer().unwrap();
+    send_pane_shell_command(
+        &remote_api,
+        remote_pane,
+        "printf 'DROP_%s\\n' READY; read dropped; printf 'UNEXPECTED_%s\\n' SUBMIT",
+    );
+    assert!(wait_until(
+        Duration::from_secs(5),
+        Duration::from_millis(20),
+        || screen_text().contains("DROP_READY")
+    ));
+    let source = base.join("dropped report.pdf");
+    fs::write(&source, vec![42u8; 2 * 1024 * 1024]).unwrap();
+    let path_text = quote(&source);
+    // Ghostty-style unbracketed drop, through the real input framer and client loop.
+    write!(input, "{path_text} ").unwrap();
+    assert!(
+        wait_until(Duration::from_secs(12), Duration::from_millis(10), || {
+            screen_text().contains("Uploaded and inserted")
+        }),
+        "native drop did not complete: {}",
+        screen_text()
+    );
+    let upload_screen = screen_text();
+    assert!(
+        upload_screen.contains("File upload"),
+        "missing upload overlay"
+    );
+    assert!(
+        !upload_screen
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .contains("File upload"),
+        "upload overlay must not occupy the top status line"
+    );
+    let uploaded: Vec<_> = fs::read_dir(base.join("uploads"))
+        .unwrap()
+        .map(|folder| folder.unwrap().path().join("dropped report.pdf"))
+        .collect();
+    assert_eq!(uploaded.len(), 1);
+    assert_eq!(fs::read(&uploaded[0]).unwrap(), fs::read(&source).unwrap());
+    assert!(
+        !screen_text().contains("UNEXPECTED_SUBMIT"),
+        "drop sent Enter"
+    );
+    assert!(
+        read_output(&output).contains("MiB"),
+        "progress was never rendered"
+    );
+    input.write_all(b"\x1b").unwrap();
+    assert!(
+        wait_until(Duration::from_secs(3), Duration::from_millis(10), || {
+            !screen_text().contains("File upload")
+        }),
+        "Esc did not close the completed upload overlay"
+    );
+    // A fragmented bracketed paste must also transfer as one drop.
+    input.write_all(b"\x1b[200~").unwrap();
+    input.write_all(path_text.as_bytes()).unwrap();
+    thread::sleep(Duration::from_millis(30));
+    input.write_all(b"\x1b[201~").unwrap();
+    assert!(
+        wait_until(Duration::from_secs(12), Duration::from_millis(10), || {
+            fs::read_dir(base.join("uploads")).unwrap().count() == 2
+                && screen_text().contains("Uploaded and inserted")
+        }),
+        "fragmented drop did not complete: {}",
+        screen_text()
+    );
+    assert!(
+        !screen_text().contains("UNEXPECTED_SUBMIT"),
+        "bracketed drop sent Enter"
+    );
+    drop(input);
+    drop(client);
+    drop(remote_server);
+    cleanup_test_base(&base);
+}
