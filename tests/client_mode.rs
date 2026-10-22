@@ -2261,7 +2261,11 @@ fn native_file_drop_uploads_from_real_client_and_never_submits() {
     use std::os::unix::fs::PermissionsExt;
 
     let _lock = test_lock();
+    // macOS temp roots (such as /var) may be symlinks; the receiver intentionally
+    // refuses symlinked destination components, so use the physical fixture path.
     let base = unique_test_dir();
+    fs::create_dir_all(&base).unwrap();
+    let base = base.canonicalize().unwrap();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
     let api_socket = runtime_dir.join("herdr.sock");
