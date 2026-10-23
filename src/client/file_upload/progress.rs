@@ -24,6 +24,8 @@ impl Progress {
         }
     }
 
+    // Transfer rates and MiB are approximate presentation values, not byte counts.
+    #[allow(clippy::cast_precision_loss)]
     pub(super) fn update(&self, received: u64, phase: &str) {
         let now = Instant::now();
         if let Ok(mut last) = self.last.lock() {
@@ -45,9 +47,9 @@ impl Progress {
             "━".repeat(filled),
             "─".repeat(10 - filled),
             percent,
-            received as f64 / 1048576.0,
-            self.size as f64 / 1048576.0,
-            received as f64 / 1048576.0 / self.started.elapsed().as_secs_f64().max(0.001)
+            received as f64 / 1_048_576.0,
+            self.size as f64 / 1_048_576.0,
+            received as f64 / 1_048_576.0 / self.started.elapsed().as_secs_f64().max(0.001)
         ));
     }
 
@@ -64,8 +66,8 @@ mod tests {
     #[test]
     fn progress_reports_bytes_and_finishes() {
         let (updates, receiver) = watch::channel(String::new());
-        let progress = Progress::new("report.pdf", 2 * 1048576, updates);
-        progress.update(1048576, "uploading");
+        let progress = Progress::new("report.pdf", 2 * 1_048_576, updates);
+        progress.update(1_048_576, "uploading");
         let message = receiver.borrow().clone();
         assert!(message.contains("50%"));
         assert!(message.contains("1.0/2.0 MiB"));

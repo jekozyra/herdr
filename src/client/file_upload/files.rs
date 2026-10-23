@@ -139,11 +139,11 @@ pub fn parse_paths(text: &str) -> Result<Vec<PathBuf>> {
                 let url = url::Url::parse(line).context("invalid clipboard file URI")?;
                 ensure!(
                     url.scheme() == "file"
-                        && matches!(url.host_str(), None | Some("") | Some("localhost")),
+                        && matches!(url.host_str(), None | Some("" | "localhost")),
                     "only local file URIs are supported"
                 );
                 url.to_file_path()
-                    .map_err(|_| anyhow::anyhow!("invalid local file URI"))
+                    .map_err(|()| anyhow::anyhow!("invalid local file URI"))
             })
             .collect();
     }

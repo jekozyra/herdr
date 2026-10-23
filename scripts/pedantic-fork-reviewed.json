@@ -1,0 +1,93 @@
+[
+ [
+  "src/client/loop_config.rs",
+  "clippy::struct_excessive_bools",
+  "more than 3 bools in a struct",
+  "8fe6a1de22d1e6ebd8ece1b117c3f042517584a1ad7d7ba4f88c11be5bb6ef1c",
+  2
+ ],
+ [
+  "src/client/mod.rs",
+  "clippy::large_futures",
+  "large future with a size of 25456 bytes",
+  "1c2d5530bc7a1401739c34d0820510f38e526dc51867d20bf61f14d792a5eb3e",
+  2
+ ],
+ [
+  "src/client/mod.rs",
+  "clippy::too_many_lines",
+  "this function has too many lines (1915/100)",
+  "75e821293c7f2803e8234086e7597595eae16a4e528826bea6413ad377069bc8",
+  2
+ ],
+ [
+  "src/client/mod.rs",
+  "clippy::too_many_lines",
+  "this function has too many lines (196/100)",
+  "7ef3491b510e524498c77e5e5fe6677cc2c724f5ea98c9e9bc6e7b3b8aa54f9e",
+  2
+ ],
+ [
+  "src/client/shell/composition.rs",
+  "clippy::too_many_lines",
+  "this function has too many lines (571/100)",
+  "d29f0c55167d4eb9fba2254232ba14dd5ebbbec36d9d261993600bf1a113f08b",
+  2
+ ],
+ [
+  "src/client/shell/file_upload.rs",
+  "clippy::wildcard_imports",
+  "usage of wildcard import",
+  "fb8a08fb8879523734a78335c61d824b8c6db5ac7339032188f31f2fcf36729c",
+  1
+ ],
+ [
+  "src/client/shell/state.rs",
+  "clippy::struct_excessive_bools",
+  "more than 3 bools in a struct",
+  "deed6702ff310eb99cd3d7041fd52f196a570ccf7a072333315a6d7c7be86938",
+  2
+ ],
+ [
+  "src/client/shell/state.rs",
+  "clippy::too_many_lines",
+  "this function has too many lines (135/100)",
+  "8a4525b502ed6e595aea168416859c34d8845b50262cc310776b07d79bfbdaee",
+  2
+ ],
+ [
+  "src/config/io.rs",
+  "clippy::too_many_lines",
+  "this function has too many lines (129/100)",
+  "1c78fd3490d120e614f7d81cbfd5d469a200a1532691d45699d028c711ff9802",
+  2
+ ],
+ [
+  "tests/client_mode.rs",
+  "clippy::redundant_closure_for_method_calls",
+  "redundant closure",
+  "f427ebf1e1671664e1a16fc31da90df11b4b1728c4321b036d68662882f76e1d",
+  1
+ ],
+ [
+  "tests/client_mode.rs",
+  "clippy::too_many_lines",
+  "this function has too many lines (160/100)",
+  "44d8273713673a19092eeeb9887e20408223b52fcfd961a9a859f4bbd06c3ece",
+  1
+ ],
+ [
+  "tests/client_mode.rs",
+  "clippy::used_underscore_binding",
+  "used underscore-prefixed binding",
+  "0a80240f5ed9ed2fe6174a2bee31cbf12aa505362fc3140ce0350e3c0c4d8c56",
+  1
+ ],
+ [
+  "tests/client_mode.rs",
+  "clippy::used_underscore_binding",
+  "used underscore-prefixed binding",
+  "0df0eb4939950673a72f9e17da7a598b76b9c4a1cea83c5e3f0b6ec867d855c6",
+  1
+ ]
+]
