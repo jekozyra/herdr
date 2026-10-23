@@ -17,6 +17,8 @@ use super::{
 const RECEIVER: &str = include_str!("receiver.py");
 const MAX_REPLY: usize = 1024 * 1024;
 
+// Wire field names (pane_id, terminal_id) are fixed by the server API.
+#[allow(clippy::struct_field_names)]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Pane {
     pub pane_id: String,
@@ -204,7 +206,8 @@ pub async fn upload(
             let mut buffer = vec![0; config.chunk_bytes];
             let mut sent = 0;
             while sent < file.size {
-                let wanted = (file.size - sent).min(config.chunk_bytes as u64) as usize;
+                let wanted = usize::try_from((file.size - sent).min(config.chunk_bytes as u64))
+                    .context("upload chunk exceeds local address space")?;
                 input.read_exact(&mut buffer[..wanted]).await?;
                 connection.write(&buffer[..wanted]).await?;
                 sent += wanted as u64;

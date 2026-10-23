@@ -532,11 +532,11 @@ mod tests {
             coalesce_file_drop_chunks(framer.push(control)),
             vec![control.to_vec()]
         );
-        let framed = b"\x1b[200~/tmp/report.pdf\x1b[201~";
-        assert!(framer.push(&framed[..15]).is_empty());
+        let paste_bytes = b"\x1b[200~/tmp/report.pdf\x1b[201~";
+        assert!(framer.push(&paste_bytes[..15]).is_empty());
         assert_eq!(
-            coalesce_file_drop_chunks(framer.push(&framed[15..])),
-            vec![framed.to_vec()]
+            coalesce_file_drop_chunks(framer.push(&paste_bytes[15..])),
+            vec![paste_bytes.to_vec()]
         );
         let typed = vec![b"a".to_vec(), b"b".to_vec()];
         assert_eq!(coalesce_file_drop_chunks(typed.clone()), typed);

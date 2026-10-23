@@ -176,19 +176,19 @@ impl FileUploadConfig {
         };
         if let Some(overrides) = self.targets.get(host) {
             if let Some(value) = &overrides.destination {
-                target.destination = value.clone();
+                target.destination.clone_from(value);
             }
             if let Some(value) = &overrides.socket {
-                target.socket = value.clone();
+                target.socket.clone_from(value);
             }
             if let Some(value) = &overrides.python {
-                target.python = value.clone();
+                target.python.clone_from(value);
             }
             if let Some(value) = overrides.retention_seconds {
                 target.retention_seconds = value;
             }
-            target.ssh = overrides.ssh.clone();
-            target.limits = overrides.limits.clone();
+            target.ssh.clone_from(&overrides.ssh);
+            target.limits.clone_from(&overrides.limits);
         }
         ensure!(
             !host.is_empty()
